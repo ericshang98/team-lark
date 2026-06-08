@@ -15,7 +15,7 @@ description: Pinclaw 团队协作系统（Agent 化的团队）。当用户想�
 - **每次进入先对齐**：每次被调用，先读一遍共享状态，让用户立刻知道项目到哪了、自己今天有什么。
 - 状态机：`待领取 → 进行中 → 待验收 →（验收人）→ 已完成 / 打回 →（回到）进行中`。交付只到"待验收"，验收人确认才"已完成"。
 
-## 配置（Base 坐标 —— 换成你团队自己的）
+## 配置（Base 坐标，全团队共用，勿改）
 
 ```
 BASE_TOKEN = <YOUR_BASE_TOKEN>
@@ -23,6 +23,8 @@ BASE_TOKEN = <YOUR_BASE_TOKEN>
 任务表     = <TASK_TABLE_ID>   （字段：标题 详情 发起人 负责人 验收人 验收条件 状态 优先级 截止日 交付物 交付说明 打回意见 创建时间 更新时间）
 全局看板   = <BOARD_VIEW_ID> （kanban，按状态分组）
 待验收     = <REVIEW_VIEW_ID> （grid，筛选 状态=待验收）
+排期       = <SCHEDULE_VIEW_ID> （grid，按截止日↑ 排序 —— 看排期用这个）
+排期甘特   = <GANTT_VIEW_ID> （gantt，创建时间→截止日 时间条）
 Base 链接  = https://<your-tenant>.feishu.cn/base/<YOUR_BASE_TOKEN>
 ```
 所有 `lark-cli base` 命令都带 `--as user --base-token <YOUR_BASE_TOKEN>`。
@@ -119,8 +121,30 @@ lark-cli docs +update --api-version v2 --doc <YOUR_FEEDBACK_DOC_TOKEN> --command
 ```
 - 主动一点：发现某步让用户明显费劲（反复出错、手填 id 等），建议"要不要我记进反馈文档，下次优化掉？"
 
-## 通知（可选，群里 @人）
-发起/交付后想在飞书群 @对方：用 lark-im 发到对应群（需 chat_id）。MVP 阶段可省，靠各自运行 skill 看状态。
+## 看排期 / 周计划
+
+- **看排期**：用户问"排期/时间线/什么时候做什么" → 读 `排期` 视图（按截止日↑），用表格讲清先后；想要时间条就给 `排期甘特` 视图链接。
+```bash
+lark-cli base +record-list --as user --base-token <YOUR_BASE_TOKEN> --table-id <TASK_TABLE_ID> --view-id <SCHEDULE_VIEW_ID> --limit 200
+```
+- **周计划/补排期**：用户说"排个期/做周计划/把没排期的安排一下" → 捞出我负责且**截止日为空**的任务，逐条问/建议一个截止日，确认后用 `record-upsert` 写回 `截止日`（`YYYY-MM-DD`）。一次性把"未排期"清空是这个动作的目标。
+
+## 状态变更自动通知（飞书 DM —— 默认必做，不是可选）
+
+**凡是改动涉及"别人"的任务流转，操作成功后立刻给当事人发一条飞书私信**（别让人靠主动跑 skill 才知道）。当事人 open_id 从任务的人员字段或成员表取。命令：
+```bash
+lark-cli im +messages-send --as user --user-id <对方open_id> --text "<一句话>"
+```
+触发与收件人：
+| 动作 | 通知谁 | 内容要点 |
+| --- | --- | --- |
+| 发起/指派任务给**别人**（负责人≠自己） | 负责人 | 新任务「X」+ 验收条件 + 截止日 |
+| 交付（→待验收） | 验收人 | 「X」待你验收 + 交付物链接 |
+| 验收通过（→已完成） | 负责人 | 「X」已验收通过 |
+| 打回 | 负责人 | 「X」被打回，意见：… |
+
+- 负责人/验收人 = 自己时**不用**通知自己。
+- 群里 @ 提醒（可选，需 chat_id）：`lark-im` 发到对应群，用 `<at user_id="ou_xxx"></at>`。
 
 ## 规则
 - 不确定字段名/选项就先 `lark-cli base +field-list --as user --base-token <YOUR_BASE_TOKEN> --table-id <表>`。
