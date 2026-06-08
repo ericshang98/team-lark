@@ -26,25 +26,32 @@
 git clone https://github.com/ericshang98/team-lark.git ~/.claude/skills/team-lark
 ```
 
-### 3. 建一个飞书自建应用（团队只需建一个，全员共用）
+### 3. 建一个飞书自建应用（团队只需建一个，全员共用 · 管理员做一次）
 
-> 这一步是给 `lark-cli` 一个 OAuth 客户端 + 权限容器。**整个团队一个应用就够**，每个人各自登录时仍是自己的身份。
+> 给 `lark-cli` 一个 OAuth 客户端 + 权限容器。本工具走**用户身份 `user_access_token`**——每人各自登录时仍是自己的身份。**整个团队一个应用就够。**
 
 1. 去 [飞书开放平台](https://open.feishu.cn/) → 创建**企业自建应用**（比如就叫 `team-lark`）。
-2. 开通**机器人**能力（之后想做群通知/@人会用到）。
-3. 加权限（scope），最小集：
-   - 通讯录**只读**：`contact:user.base:readonly`、`contact:user.employee_id:readonly`（用来按姓名/open_id 认人）
-   - 多维表格**读写**：`bitable:app`（读写任务表）
-   - （可选，群通知）即时通讯：`im:message`、`im:chat`
-4. 设**可用范围 = 团队成员**，然后**发布版本**（管理员审批通过才生效）。
+2. 开通**机器人**能力（之后做群通知/@人会用到）。
+3. 「权限管理」→ 切到 **用户身份权限 `user_access_token`** 标签，开通：
+   - **读人设要的通讯录权限（免审，必开）**：`contact:user.department:readonly`、`contact:user.employee:readonly`（用来读部门/职位生成人设）。
+     > 注意：**不要**用 `contact:contact:readonly`（高敏感、要管理员审核）；上面两个免审就够。
+   - **多维表格读写 + 文档/IM**：`lark-cli` 默认 OAuth 已带常用的 bitable/docs/im 等权限；若平台要求显式勾选，按需补「多维表格」`bitable`、（群通知）`im:message`/`im:chat`。
+4. 设**可用范围 = 团队成员**，**创建版本 → 发布上线**（管理员审批通过才生效）。
 
-### 4. 每个成员各自登录
+### 4. 每个成员各自登录（⚠️ 必须带 `--scope`，这是最大的坑）
+
+`lark-cli` 默认登录**不会**请求细粒度通讯录权限 → 不带 `--scope` 就读不到部门/职位、人设会残。**复制整条（一行，别断行）**：
 
 ```bash
-lark-cli auth login   # 浏览器 OAuth，各自以本人飞书身份登录
+lark-cli auth login --domain all --scope "contact:contact.base:readonly,contact:department.base:readonly,contact:department.organize:readonly,contact:job_title:readonly,contact:user.base:readonly,contact:user.department:readonly,contact:user.department_path:readonly,contact:user.email:readonly,contact:user.employee:readonly,contact:user.employee_id:readonly,contact:user.phone:readonly,contact:user:search"
 ```
 
-> ⚠️ 飞书是**两层权限**，都要过：① 上面应用的 scope（管理员审批一次）② **每个人对那张具体 Base 文档有编辑权**（在 Base 右上角「分享」里把成员加为可编辑）。缺任一层，写入会 permission denied。
+终端会打印授权链接，**原样**复制到浏览器、用**你自己的飞书账号**同意。看到 `本次新授予 ... contact:user.department:readonly contact:user.employee:readonly` 即成功。
+
+> - 报 `scope list contains invalid or malformed scopes`？个别较新的 scope 名当前 CLI 版本不认 → 精简到只留 `contact:user.department:readonly,contact:user.employee:readonly` 两个即可。
+> - 报 `99991679 权限不足` / `本次新授予:（空）`？多半是没带 `--scope` 或拼错了。
+
+> ⚠️ 飞书是**两层权限**，都要过：① 应用 scope（上面，管理员审批一次）② **每个人对那张具体 Base 文档有编辑权**（在 Base 右上角「分享」里把成员加为可编辑）。缺任一层，写入会 permission denied。读出来部门是 `0`、职位为空 = 权限通了但通讯录**没填**，请管理员在后台补部门/职位。
 
 ### 5. 建团队的多维表格（Base）
 
