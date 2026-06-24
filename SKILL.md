@@ -146,6 +146,35 @@ lark-cli im +messages-send --as user --user-id <对方open_id> --text "<一句�
 - 负责人/验收人 = 自己时**不用**通知自己。
 - 群里 @ 提醒（可选，需 chat_id）：`lark-im` 发到对应群，用 `<at user_id="ou_xxx"></at>`。
 
+## 主动模式（Ambient / 被定时器触发）
+
+**这是被外部时钟（cron / launchd 定时器，或飞书定时自动化）拉起、无头、无交互用户的运行路径。** 触发方式形如 `claude -p "/team-lark 主动模式"`（安装见 README「主动模式」一节）。和正常会话最大的区别：**没有"当前登录用户"**，所以不走「第 0 步对齐」，改走**团队级遍历**——为每个成员各算一份、各发一条。
+
+> **排程绝不内置在本 skill。** 这里不写、也永远不要写任何 cron / setTimeout / 轮询计时。skill 只管"被叫起来跑一轮"，到点叫醒交给系统定时器。
+
+**铁律**：本模式**只读 + 发 DM**，**绝不**改任何任务的状态/字段（不领取、不交付、不验收、不打回）。
+
+**步骤（全部复用本文件已有命令与模板）：**
+
+1. **取全员**（替代"我是谁"锚点）：
+   ```bash
+   lark-cli base +record-list --as user --base-token <YOUR_BASE_TOKEN> --table-id <MEMBER_TABLE_ID> --limit 200
+   ```
+   得每人 `{姓名, open_id, 人设, 负责模块}`。
+2. **取团队上下文**（只读一次缓存，循环里切分）：全局看板 + 任务表，对照今天算逾期 / 本周硬 deadline。
+3. **for each 成员**：用其姓名按「负责人」搜出任务，算他的：逾期 / 今日该做 / 待验收 / 阻塞别人的。套本文件「今日简报」模板：并行多轨者走**全景态**、单线成员走**聚焦态**，用该成员人设口吻。
+4. **私聊 DM 给本人**（成员表 `open_id` 即收件人）：
+   ```bash
+   lark-cli im +messages-send --as user --user-id <该成员open_id> \
+     --markdown "<该成员的个人简报>" --idempotency-key "proactive-<YYYY-MM-DD-HH>-<open_id>"
+   ```
+   **长简报必须主动分片**：飞书单条 markdown 约 **1.5KB 上限**，超了报 `99992402 field validation failed`。发前按段落切成多条（每条 ≤1.2KB）依次发——**别先发整条等报错再重试，更绝不发"测试/探针"短消息试长度**。每片用**不同** key：`proactive-<YYYY-MM-DD-HH>-<open_id>-<片号>`（同 key 后续片会被飞书去重吞掉）。
+5. **团队群摘要**（给了群 chat_id 才发）：待验收积压 / 无人认领 / 逼近 deadline。
+
+**降噪**：每轮触发每人最多一条 DM；某成员**无可推进项**时**跳过不打扰**；查不到 open_id 的人不发也不中断整轮。
+**演练**：触发提示里带「演练 / dry-run」时**只算只打印、跳过第 4/5 步所有 `messages-send`**，不发任何消息。上线前先演练一轮看简报对不对。
+**权限**：主动模式靠 `lark-cli im +messages-send` 给全员发私信 —— 应用必须开通「发送单聊消息」权限（见 README §需要哪些权限），否则会 permission denied。
+
 ## 规则
 - 不确定字段名/选项就先 `lark-cli base +field-list --as user --base-token <YOUR_BASE_TOKEN> --table-id <表>`。
 - 单选字段（状态/优先级）写选项名字符串；人员字段（发起人/负责人/验收人）写 `[{"id":"ou_xxx"}]`。
