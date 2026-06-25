@@ -166,9 +166,10 @@ lark-cli im +messages-send --as user --user-id <对方open_id> --text "<一句�
 4. **私聊 DM 给本人**（成员表 `open_id` 即收件人）：
    ```bash
    lark-cli im +messages-send --as user --user-id <该成员open_id> \
-     --markdown "<该成员的个人简报>" --idempotency-key "proactive-<YYYY-MM-DD-HH>-<open_id>"
+     --markdown "<该成员的个人简报>" --idempotency-key "pa-<MMDD>-<HH>-<open_id末8位>-<片号>"
    ```
-   **长简报必须主动分片**：飞书单条 markdown 约 **1.5KB 上限**，超了报 `99992402 field validation failed`。发前按段落切成多条（每条 ≤1.2KB）依次发——**别先发整条等报错再重试，更绝不发"测试/探针"短消息试长度**。每片用**不同** key：`proactive-<YYYY-MM-DD-HH>-<open_id>-<片号>`（同 key 后续片会被飞书去重吞掉）。
+   ⚠️ **key 必须 ≤50 字符**（飞书 `uuid` 字段上限，超了报 `99992402 field validation failed`）——**别用完整 open_id**（光它就 35 字符，加前缀必爆），用 `pa-<MMDD>-<HH>-<open_id末8位>-<片号>`（如 `pa-0625-09-818b81dd-1`，21 字符）。含整点 → 飞书 1 小时去重窗口内同轮重投会去重。
+   **长简报必须主动分片**：飞书单条 markdown 约 **1.5KB 上限**，发前按段落切成多条（每条 ≤1.2KB）依次发——**别先发整条等报错再重试，更绝不发"测试/探针"短消息试长度**。分片只改**片号**（1/2/3…），别复用同一个 key（后续片会被去重吞掉）。
 5. **团队群摘要**（给了群 chat_id 才发）：待验收积压 / 无人认领 / 逼近 deadline。
 
 **降噪**：每轮触发每人最多一条 DM；某成员**无可推进项**时**跳过不打扰**；查不到 open_id 的人不发也不中断整轮。
