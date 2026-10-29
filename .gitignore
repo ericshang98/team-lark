@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+software.json
+software-*.json

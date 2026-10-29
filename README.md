@@ -156,3 +156,21 @@ chmod +x ambient/run-proactive.sh
 ## 许可
 
 MIT
+
+
+## Software 协作看板
+
+说 `team-lark software`，读取 [software/SKILL.md](software/SKILL.md)。每件工作可关联多个 PR；软件进展、协调事项和每人独立的阅读位置存放在飞书。运行一次同步并查看变化，不后台轮询，不自动合并或部署。
+
+已有 team-lark 的成员更新仓库后，复用团队内部共享的 `~/.team-lark/software.json`；不要为每个人重复建表。保留本地父 Skill 的 Base 配置。若本机是无 Git 的 Skill 副本，从本仓库复制 `software/` 子目录，并把父 SKILL.md 的「Software 子 Skill」路由段合入，勿覆盖本地其他规则。
+
+首次建表由团队一人将 `software/config.example.json` 填入自己的本地配置后执行：
+
+```bash
+python3 software/scripts/software.py setup
+python3 software/scripts/software.py sync
+```
+
+同步使用各自已登录的 `gh` 与 `lark-cli --as user`，配置中的账号映射必须核实。成员共享配置只包含资源坐标，凭证不共享。完整用法、人工摘要 JSON、失败恢复和阅读回执见子 Skill。
+
+验证：`python3 -m unittest discover -s software/tests -v`。
