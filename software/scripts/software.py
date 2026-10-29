@@ -339,7 +339,7 @@ def revision(old, new):
     if old and old.get('内容摘要') == fingerprint(new):
         return {}
     changed = [k for k in CONTENT if normalized((old or {}).get(k)) != normalized(new.get(k))]
-    summary = '首次登记' if not old else '更新：' + '、'.join(k for k in changed if k != 'PR事实')
+    summary = '首次登记' if not old else '更新：' + '、'.join('PR提交/内容' if k == 'PR事实' else k for k in changed)
     return {'变化ID': uuid.uuid4().hex, '变化摘要': summary, '变化时间UTC': now(), '内容摘要': fingerprint(new)}
 
 
