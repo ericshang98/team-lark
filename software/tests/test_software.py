@@ -172,6 +172,12 @@ class SoftwareTests(unittest.TestCase):
         self.apply()
         self.assertEqual(self.board.data['w'][0]['协调事项'],'User edited in Feishu')
         self.assertEqual(len(self.board.data['e']),2)
+    def test_head_only_update_has_a_readable_change_summary(self):
+        self.apply()
+        self.plan=None
+        self.snapshot['prs'][0]['headRefOid']='new-head'
+        self.apply()
+        self.assertIn('PR提交/内容',self.board.data['w'][0]['变化摘要'])
     def test_unchecked_is_not_passed(self):
         self.assertIn('无检查记录',sw.machine_patch([pr()])['检查与评审'])
 
