@@ -4,7 +4,9 @@
 
 ## 凭据与启用
 
-在目标私有仓库配置 Actions secrets：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`SOFTWARE_BOARD_CONFIG`（已有团队 JSON）。仓库 `GITHUB_TOKEN` 只授予 contents、pull-requests、checks、statuses 读取权限。机器人需 `bitable:app` 权限或对应的记录读取/创建/修改、字段读取权限，并成为目标 Base 的可编辑协作者。用户身份已有权限不代表机器人有权限。凭据只用 stdin 写入 secrets，不打印、不提交；公开 Skill 仓库不放团队配置。
+在目标私有仓库配置 Actions secrets：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`SOFTWARE_BOARD_CONFIG`（已有团队 JSON）。仓库 `GITHUB_TOKEN` 只授予 contents、pull-requests、checks、statuses 读取权限。机器人开通 `base:field:read`、`base:record:read`、`base:record:retrieve`、`base:record:create`、`base:record:update` 并发布生效，成为目标 Base 的可编辑文档应用；不需要删除记录或管理 Base 的权限。用户身份已有权限不代表机器人有权限。凭据只用 stdin 写入 secrets，不打印、不提交；公开 Skill 仓库不放团队配置。
+
+Base 开启高级权限时，普通协作者授权还不够。建立仅可编辑 works/events 两张表的自定义角色，其他表设为无权限；通过仅含现有管理员与该机器人的私有权限群加入角色。核实群成员，限制后续拉人，避免授权扩散。不要关闭高级权限或把应用提升为 Base 管理员。
 
 工作流从默认分支检出，并将本 Skill 固定到已经评审的完整提交 SHA。`pull_request_target` 只把事件当触发信号；禁止检出或执行 PR head/merge 分支、下载 PR artifact、将 PR 标题/正文拼入命令。`workflow_dispatch` 也只运行默认分支代码。所有 PR 的任何路径均影响团队状态，因此事件范围不能按产品目录缩窄。
 

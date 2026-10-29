@@ -71,6 +71,15 @@ class ServerTests(unittest.TestCase):
     def test_readers_access_denied(self):
         with self.assertRaises(ValueError): self.board().list('r')
 
+    def test_legacy_links_match_user_adapter_and_keep_fingerprint(self):
+        for ids, expected in [(None, ''), (['rec_b', 'rec_a'], [{'id':'rec_a'}, {'id':'rec_b'}])]:
+            row = server.FeishuBoard.row({'record_id':'r1', 'fields':{
+                '工作ID':'work', '关联任务':[{'record_ids':ids, 'table_id':'tasks',
+                'text':None if ids is None else 'Mutable linked title', 'type':'text'}]}})
+            self.assertEqual(row['关联任务'], expected)
+            self.assertEqual(server.sw.fingerprint(row), server.sw.fingerprint(
+                {'_id':'r1', '工作ID':'work', '关联任务':expected}))
+
     def test_no_blind_write_retry(self):
         b = self.board()
         with patch.object(server.urllib.request, 'urlopen', side_effect=server.urllib.error.URLError('timeout')) as call:
