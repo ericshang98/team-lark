@@ -473,6 +473,19 @@ def apply(board, snapshot, plan, me, import_history=False, dry_run=False, work_i
     print(f'已核实 {len(prs)} PR；新增 {len(creates)} 项工作；{sum("变化ID" in p for _, p in updates)} 项实质变化。')
 
 
+def server_managed(repo):
+    """Fail closed on discovery errors: never start a competing local writer."""
+    result = subprocess.run(['gh', 'api', f'repos/{repo}/actions/variables?per_page=100',
+        '--paginate', '--jq', '.variables[] | select(.name == "SOFTWARE_BOARD_SYNC_MODE") | .value'],
+        capture_output=True, text=True, timeout=30)
+    if result.returncode:
+        raise RuntimeError('Cannot verify GitHub software sync mode; local write deferred')
+    mode = result.stdout.strip()
+    if mode not in ('', 'pending', 'github-actions'):
+        raise RuntimeError('Unknown GitHub software sync mode; local write deferred')
+    return mode == 'github-actions'
+
+
 def sync_pr(board, url, me):
     """Refresh one work and all its linked PRs; never consume a reading receipt."""
     repo, number = pr_ref(url)

@@ -72,9 +72,22 @@ class HookTests(unittest.TestCase):
             hook.drain(queue,config,sync=lambda u:hook.enqueue(queue,u,'merged',config))
             self.assertEqual(len(list(queue.glob('*.json'))),1)
     def test_missing_config_keeps_job_and_returns_pending(self):
-        with tempfile.TemporaryDirectory() as d, patch.object(hook,'QUEUE',Path(d)/'pending'), contextlib.redirect_stderr(io.StringIO()):
+        with tempfile.TemporaryDirectory() as d, patch.object(hook,'QUEUE',Path(d)/'pending'), patch.object(hook.sw,'server_managed',return_value=False), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(hook.main(['--pr',pr()['url'],'--event','created','--config',str(Path(d)/'missing.json')]),2)
             self.assertEqual(len(list(hook.QUEUE.glob('*.json'))),1)
+    def test_server_mode_skips_local_config_auth_and_writes(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(hook.sw,'server_managed',return_value=True), patch.object(hook.sw,'whoami') as auth, contextlib.redirect_stdout(io.StringIO()):
+            queue=Path(d)/'pending'; config=Path(d)/'missing.json'
+            hook.enqueue(queue,pr()['url'],'created',config)
+            self.assertTrue(hook.drain(queue,config))
+            auth.assert_not_called()
+            self.assertEqual(list(queue.glob('*.json')),[])
+    def test_uncertain_server_mode_preserves_pending(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(hook.sw,'server_managed',side_effect=RuntimeError('network')), contextlib.redirect_stderr(io.StringIO()):
+            queue=Path(d)/'pending'; config=Path(d)/'missing.json'
+            hook.enqueue(queue,pr()['url'],'created',config)
+            self.assertFalse(hook.drain(queue,config))
+            self.assertEqual(len(list(queue.glob('*.json'))),1)
     def test_distinct_configuration_jobs_are_not_consumed(self):
         with tempfile.TemporaryDirectory() as d:
             queue=Path(d)/'pending'
