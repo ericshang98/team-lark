@@ -60,10 +60,19 @@ def drain(queue, config_path, sync=None, limit=5):
     if not grouped:
         return True
     if sync is None:
-        config = json.loads(Path(config_path).read_text())
-        board = sw.Board(config)
-        me = sw.whoami(config)
-        sync = lambda url: sw.sync_pr(board, url, me)
+        local = {}
+        modes = {}
+        def sync(url):
+            repo, _ = sw.pr_ref(url)
+            if repo not in modes:
+                modes[repo] = sw.server_managed(repo)
+            if modes[repo]:
+                print(f'已交由 GitHub 自动同步：{url}；完成状态见 Software board sync 工作流。')
+                return
+            if not local:
+                config = json.loads(Path(config_path).read_text())
+                local.update(board=sw.Board(config), me=sw.whoami(config))
+            sw.sync_pr(local['board'], url, local['me'])
     success = True
     for url, paths in list(grouped.items())[:limit]:
         try:
