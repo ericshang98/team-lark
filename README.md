@@ -174,3 +174,6 @@ python3 software/scripts/software.py sync
 同步使用各自已登录的 `gh` 与 `lark-cli --as user`，配置中的账号映射必须核实。成员共享配置只包含资源坐标，凭证不共享。完整用法、人工摘要 JSON、失败恢复和阅读回执见子 Skill。
 
 验证：`python3 -m unittest discover -s software/tests -v`。
+
+
+软件同步也支持现有 PR 工作流的成功后步骤：`python3 software/scripts/after_pr.py --pr <PR_URL> --event created`，合并确认后用 `--event merged`，已有 PR 推送后用 `updated`。它只更新该 PR 所属工作，不标记已读；失败保留本地待补事件，下次自动尝试补同步。请将这一步加入团队的提交/合并 Skill；不是 GitHub 全局 webhook。详见子 Skill。

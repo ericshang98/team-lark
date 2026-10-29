@@ -23,6 +23,23 @@ description: 同步软件协作看板，查看各自未读变化，登记开工�
 
 所有命令也接受 `--config <path>`（放在子命令前）。`collect --output <path>` 只收集证据，适合历史归组；`sync --dry-run` 不写飞书、不推进阅读记录，但会保存本地快照。
 
+## 提 PR / 合并后自动同步
+
+在团队现有提交 PR 流程中，创建 PR、推送更新到已有 PR、确认实际合并成功后，自动调用：
+
+```bash
+python3 <本目录>/scripts/after_pr.py --pr <真实PR_URL> --event created
+# 已有 PR 更新用 updated，实际合并成功用 merged
+```
+
+若项目有 `.agents/skills/commit-push-pr/scripts/sync-software.py`，优先使用该仓库入口；它会定位本机 Skill，并在缺少依赖时保留待补记录。不要为了看板同步再次创建或合并 PR。
+
+钩子读取 GitHub 当前事实，只刷新该 PR 所属工作及其同组 PR，保留人工说明；新 PR 按完整 URL 查重，先用真实 PR 标题登记摘要。它不运行今日简报、不生成阅读回执、不改变已读、不发私信。其他人的未合并工作不会因这次事件被更新。已有本地计划需要归组时仍按 Plan 使用工作ID维护。
+
+失败返回 2，原 Git 操作仍然成功；必须报告「Git 已完成，飞书待补同步」。待补事件在 `~/.team-lark/software-hooks/pending/`，下次调用自动补最多 5 项，同一 PR 多个事件合并处理，重新查最新状态；不会重放过期状态。可用 `after_pr.py --retry` 单独恢复。缺配置/登录失败保留队列，不默默丢弃；没有后台定时器。一个机器上的钩子使用文件锁串行写，跨机器冲突按下方恢复规则处理。
+
+此自动化覆盖接入后的 Agent PR 流程，不监听绕过流程的 GitHub 网页操作。自动合并入队不是 MERGED，须以 GitHub实际状态为准。
+
 ## Plan
 
 只填要更新的字段；省略的人工字段保留，传空字符串表示明确清空。`owner` 是配置中的 GitHub login，不根据名字猜 open_id。`module` 用英文逗号分隔统一模块名，如 `Cloud,Desktop,iOS`。
