@@ -72,7 +72,16 @@ class FeishuBoard:
 
     @staticmethod
     def row(record):
-        return dict(_id=record['record_id'], **{k: sw.normalized(v) for k, v in record['fields'].items()})
+        fields = {}
+        for name, value in record['fields'].items():
+            # Legacy REST expands links into display text plus record_ids. Keep
+            # the IDs used by the user adapter, not mutable linked titles.
+            if isinstance(value, list) and value and all(isinstance(v, dict) and 'record_ids' in v for v in value):
+                ids = sorted({rid for v in value for rid in (v['record_ids'] or [])})
+                fields[name] = [{'id': rid} for rid in ids] if ids else ''
+            else:
+                fields[name] = sw.normalized(value)
+        return dict(_id=record['record_id'], **fields)
 
     def list(self, table, fields=None, condition=None):
         if condition:
