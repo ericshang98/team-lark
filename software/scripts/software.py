@@ -381,9 +381,15 @@ def human_patch(item, config, me, import_history):
     return out
 
 
-def apply(board, snapshot, plan, me, import_history=False, dry_run=False):
+def apply(board, snapshot, plan, me, import_history=False, dry_run=False, work_ids=None):
     table = board.c['tables']['works']
     old_rows = board.list(table)
+    index_unique(old_rows, '工作ID')
+    if work_ids is not None:
+        wanted = {p['url'] for p in snapshot['prs']}
+        if any(wanted.intersection(urls(r)) for r in old_rows if r['工作ID'] not in work_ids):
+            raise RuntimeError('PR grouping changed during targeted sync; reread before writing')
+        old_rows = [r for r in old_rows if r['工作ID'] in work_ids]
     old = index_unique(old_rows, '工作ID')
     prs = {p['url']: p for p in snapshot['prs']}
     # Validate the entire plan and PR ownership before any mutation.
@@ -463,8 +469,38 @@ def apply(board, snapshot, plan, me, import_history=False, dry_run=False):
         return all(key in indexed and all(normalized(indexed[key].get(k)) == normalized(v)
                    for k, v in patch.items() if k != '_id') for key, patch in expected)
     result = confirmed_read(lambda: board.list(table), verified, 'Write verification failed; stop and inspect')
-    reconcile_events(board, result)
+    reconcile_events(board, [r for r in result if work_ids is None or r['工作ID'] in work_ids])
     print(f'已核实 {len(prs)} PR；新增 {len(creates)} 项工作；{sum("变化ID" in p for _, p in updates)} 项实质变化。')
+
+
+def sync_pr(board, url, me):
+    """Refresh one work and all its linked PRs; never consume a reading receipt."""
+    repo, number = pr_ref(url)
+    if repo not in board.c['repos']:
+        raise RuntimeError(f'Repository is not configured for this board: {repo}')
+    url = f'https://github.com/{repo}/pull/{number}'
+    works = board.list(board.c['tables']['works'])
+    index_unique(works, '工作ID')
+    matches = [r for r in works if url in urls(r)]
+    if len(matches) > 1:
+        raise RuntimeError('PR belongs to multiple works; resolve grouping first')
+    key = matches[0]['工作ID'] if matches else f'{repo}#{number}'
+    targets = urls(matches[0]) if matches else [url]
+    if any(pr_ref(target)[0] not in board.c['repos'] for target in targets):
+        raise RuntimeError('Linked work contains an unconfigured repository')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        prs = list(pool.map(fetch_pr, targets))
+    current = next(p for p in prs if p['url'] == url)
+    if current['author']['login'] not in board.c['members']:
+        raise RuntimeError('PR author has no verified team member mapping')
+    plan = None
+    if not matches and current['author']['login'] == me['github']:
+        # A concise evidence-based default. Never replace an existing human summary.
+        plan = {'works': [{'key': key, 'owner': me['github'], 'title': current['title'],
+                           'summary': current['title'], 'branch': current['headRefName'],
+                           'prs': [url], 'validation': '安装与上线未核实；测试见 PR 说明及检查。'}]}
+    apply(board, {'prs': prs, 'collected_at': now()}, plan, me, work_ids={key})
+    print(f'软件看板已同步：{url} → {current["state"]}；未改变阅读记录。')
 
 
 def report(board, me, path):
