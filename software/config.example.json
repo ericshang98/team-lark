@@ -1,0 +1,9 @@
+{
+  "base_token": "YOUR_BASE_TOKEN",
+  "base_url": "https://your-tenant.feishu.cn/base/YOUR_BASE_TOKEN",
+  "task_table": "YOUR_TASK_TABLE_ID",
+  "repos": ["example/project"],
+  "members": {
+    "my-github-login": {"name": "Your Name", "open_id": "ou_REPLACE_WITH_VERIFIED_ID"}
+  }
+}
