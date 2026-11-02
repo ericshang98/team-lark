@@ -349,13 +349,27 @@ def event(row):
             '快照': dumps({k: row.get(k) for k in CONTENT})}
 
 
+def known_event_ids(records):
+    # 变化ID is a fresh uuid per change and an event row is derived from it, so two
+    # rows with one 变化ID are the same event written twice (an interrupted run whose
+    # write landed after its verification read). The history is intact; never let
+    # that replay block every later sync. Works stay strictly unique.
+    ids = set()
+    for row in records:
+        value = row.get('变化ID')
+        if not value:
+            raise RuntimeError('Missing business key: 变化ID')
+        ids.add(value)
+    return ids
+
+
 def reconcile_events(board, works):
     table = board.c['tables']['events']
-    known = index_unique(board.list(table, ['变化ID']), '变化ID')
+    known = known_event_ids(board.list(table, ['变化ID']))
     missing = [event(row) for row in works if row.get('变化ID') and row['变化ID'] not in known]
     board.batch(table, missing)
     if missing:
-        confirmed_read(lambda: index_unique(board.list(table, ['变化ID']), '变化ID'),
+        confirmed_read(lambda: known_event_ids(board.list(table, ['变化ID'])),
                        lambda current: all(e['变化ID'] in current for e in missing),
                        'Event write not verified; do not replay the write blindly')
 
