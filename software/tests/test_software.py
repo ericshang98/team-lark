@@ -110,6 +110,20 @@ class SoftwareTests(unittest.TestCase):
         self.apply()
         self.assertEqual(len(self.board.data['e']),1)
         self.assertEqual(len(self.board.data['w']),1)
+    def test_replayed_event_rows_do_not_block_sync(self):
+        self.apply()
+        # An interrupted earlier run wrote the same event row twice.
+        self.board.data['e'].append(dict(self.board.data['e'][0],_id='e-replay'))
+        self.plan['works'][0]['summary']='Changed after the replay'
+        self.snapshot['collected_at']='2026-10-29T03:00:00+00:00'
+        self.apply()
+        self.assertEqual(len(self.board.data['w']),1)
+        self.assertEqual(len({r['变化ID'] for r in self.board.data['e']}),2)
+    def test_duplicate_work_rows_still_stop(self):
+        self.apply()
+        self.board.data['w'].append(dict(self.board.data['w'][0],_id='w-copy'))
+        with self.assertRaisesRegex(RuntimeError,'Duplicate 工作ID'):
+            self.apply()
     def test_one_pr_cannot_belong_to_two_works(self):
         self.plan['works'].append(dict(self.plan['works'][0],key='another'))
         with self.assertRaisesRegex(RuntimeError,'multiple works'):
